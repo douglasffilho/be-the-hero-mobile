@@ -7,7 +7,7 @@ const IncidentService = {
                 `/incidents?page=${page}&size=${size}`
             );
 
-            return response.data;
+            return { incidents: response.data, total: response.headers["x-total"]};
         } catch (error) {
             if (!error.response || !error.response.status) {
                 return {

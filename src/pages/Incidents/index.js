@@ -13,17 +13,18 @@ const IncidentsView = () => {
     const navigation = useNavigation();
 
     const [incidents, setIncidents] = useState([]);
-    const [refreshing] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
+    const [total, setTotal]  = useState(0);
+    const [page, setPage] = useState(1);
 
-    const PAGE = 1;
-    const DEFAULT_PAGE_SIZE = 10;
+    const DEFAULT_PAGE_SIZE = 5;
 
-    const findIncidents = useCallback(async () => {
-        const data = await IncidentService.findAllIncidents(PAGE, DEFAULT_PAGE_SIZE);
+    const loadIncidents = async () => {
+        const data = await IncidentService.findAllIncidents(1, DEFAULT_PAGE_SIZE);
 
-        if (data && !data.error) {
+        if (data.incidents && !data.error) {
             const incidentsWithOngData = [];
-            for (const incident of data) {
+            for (const incident of data.incidents) {
                 const ongData = await OngService.findOngByEmail(incident.ongEmail);
                 const incidentWithOngData = {...incident, ong: ongData};
 
@@ -32,17 +33,49 @@ const IncidentsView = () => {
                 }
             }
 
+            setTotal(data.total);
             setIncidents(incidentsWithOngData);
         }
-    }, []);
+    };
+
+    const loadMoreIncidents = async () => {
+        setRefreshing(true);
+
+        const nextPage = page + 1;
+
+        const data = await IncidentService.findAllIncidents(nextPage, DEFAULT_PAGE_SIZE);
+
+        setRefreshing(false);
+
+        setPage(nextPage);
+
+        if (data.incidents && !data.error) {
+            const incidentsWithOngData = [];
+            for (const incident of data.incidents) {
+                const ongData = await OngService.findOngByEmail(incident.ongEmail);
+                const incidentWithOngData = {...incident, ong: ongData};
+
+                if (incidentWithOngData.ong && incidentWithOngData.ong.name) {
+                    incidentsWithOngData.push(incidentWithOngData);
+                }
+            }
+
+            setIncidents(incidents.concat(incidentsWithOngData));
+        }
+    };
 
     useEffect(() => {
-        findIncidents();
-    }, [findIncidents]);
+        loadIncidents();
+    }, []);
 
-    const refreshPage = useCallback(() => {
-        findIncidents();
-    }, [findIncidents]);
+    const refreshPage = () => {
+        setPage(1);
+        loadIncidents();
+    };
+
+    const loadMore = () => {
+        loadMoreIncidents();
+    };
 
     const handleViewDetailsOnPress = useCallback((incident) => {
         return () => {
@@ -56,7 +89,7 @@ const IncidentsView = () => {
                 <Image source={logo} />
 
                 <Text style={styles.headerText}>
-                    Total de <Text style={styles.headerTextBold}>{incidents.length} casos</Text>
+                    {incidents.length}/<Text style={styles.headerTextBold}>{total}</Text>
                 </Text>
             </View>
 
@@ -71,6 +104,8 @@ const IncidentsView = () => {
                 showsVerticalScrollIndicator={false}
                 refreshing={refreshing}
                 onRefresh={refreshPage}
+                onEndReached={loadMore}
+                onEndReachedThreshold={0.2}
                 renderItem={({item}) => {
                     return (
                         <View style={styles.incident}>
